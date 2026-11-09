@@ -91,19 +91,16 @@ def notify(title, msg):
             pass
 
 def search_china_stocks(keyword):
-    """按股票代码或中文名称搜索 A 股候选项。"""
+    """按股票代码或中文名称搜索 A 股、场内基金和指数。"""
     keyword = keyword.strip()
     if not keyword:
         return []
-    url = (
-        "https://suggest3.sinajs.cn/suggest/"
-        "type=11,12,13,14,15,21,22,23&key=" + urllib.parse.quote(keyword)
-    )
+    url = "https://suggest3.sinajs.cn/suggest/key=" + urllib.parse.quote(keyword)
     req = urllib.request.Request(
         url,
         headers={"Referer": "https://finance.sina.com.cn", "User-Agent": "Mozilla/5.0"},
     )
-    data = urllib.request.urlopen(req, timeout=5).read().decode("gbk", "ignore")
+    data = urllib.request.urlopen(req, timeout=5).read().decode("gb18030", "ignore")
     if '="' not in data:
         return []
     body = data.split('"', 2)[1]
@@ -120,6 +117,26 @@ def search_china_stocks(keyword):
         seen.add(code)
         results.append((code, name))
     return results[:20]
+
+
+def direct_china_code_results(keyword):
+    """为六位证券代码提供本地兜底，搜索服务不可用时仍可添加。"""
+    code = keyword.strip().lower()
+    if re.fullmatch(r"(?:sh|sz|bj)\d{6}", code):
+        return [(code, f"{code[2:]} · 股票/ETF/指数")]
+    if not re.fullmatch(r"\d{6}", code):
+        return []
+    if code.startswith(("5", "6", "9")):
+        markets = ("sh",)
+    elif code.startswith(("1", "2", "3")):
+        markets = ("sz",)
+    elif code.startswith(("4", "8")):
+        markets = ("bj",)
+    elif code.startswith("0"):
+        markets = ("sh", "sz")
+    else:
+        markets = ("sh",)
+    return [(market + code, f"{code} · 股票/ETF/指数") for market in markets]
 
 
 def is_us_code(code):
@@ -161,7 +178,14 @@ def search_stocks(keyword):
             results.extend(searcher(keyword))
         except Exception:
             pass
-    return results[:24]
+    results.extend(direct_china_code_results(keyword))
+    unique = []
+    seen = set()
+    for code, name in results:
+        if code not in seen:
+            unique.append((code, name))
+            seen.add(code)
+    return unique[:24]
 
 def to_sina(code):
     code = code.strip().lower()
