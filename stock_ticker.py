@@ -1280,7 +1280,11 @@ class TickerTable(tk.Tk):
             lbls[4].config(text=f"{chg:+.2f}%", fg=c)
             extended_labels = self.extended_rows.get(code, [])
             if extended_labels and extended and show_extended:
-                extended_price, extended_diff, extended_pct = extended
+                extended_price = extended[0]
+                # 扩展时段行情统一以上一常规时段收盘价为基准。行情源自带的
+                # 涨跌字段偶尔存在延迟或口径变化，因此直接由两项价格计算。
+                extended_diff = extended_price - price
+                extended_pct = extended_diff / price * 100 if price else 0
                 extended_color = self.col_color(extended_pct)
                 extended_labels[0].config(text=f"{extended_price:,.3f}", fg=extended_color)
                 extended_labels[1].config(text=f"{extended_diff:+.3f}", fg=extended_color)
